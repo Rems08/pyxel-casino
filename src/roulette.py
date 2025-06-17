@@ -33,6 +33,7 @@ from typing import Dict, List, Tuple
 
 import pyxel
 from common import BET_INCREMENT, draw_text_center, InputHelper
+from roulette_wheel_animation import RouletteWheel
 
 # ───────────────────────── wheel layout ────────────────────────────────
 ROULETTE_NUMBERS = list(range(37))                # 0‑36
@@ -66,6 +67,9 @@ class RouletteGame:
     def __init__(self, app) -> None:
         self.app   = app
         self.input = app.input  # InputHelper shared across scenes
+        self.wheel = RouletteWheel(pyxel.width // 2,      # centre-x
+                           pyxel.height // 2 - 10,  # centre-y
+                           70)       
         self.reset()
 
     # ----------------------------------------------------------------- state
@@ -77,6 +81,7 @@ class RouletteGame:
         self._spin_ticks   = 0
         self.win_amount    = 0
         self.input.reset()
+        self.wheel.reset()
 
     # ---------------------------------------------------------------- helpers
     def _sel_label(self) -> str:
@@ -115,14 +120,18 @@ class RouletteGame:
 
     # ----------------------------------------------------------------- update
     def update(self) -> None:
-        if self._spin_ticks:                                # spinning…
-            self._spin_ticks -= 1
-            if self._spin_ticks == 0:                       # settle
-                self.result = random.choice(ROULETTE_NUMBERS)
-                if self._player_wins():
+        if self._spin_ticks:                        # wheel is spinning ──────
+            self.wheel.update()                     # advance animation
+            if not self.wheel.is_spinning:          # wheel just stopped
+                self._spin_ticks = 0                # clear flag → result mode
+                if self._player_wins():             # settle bet
                     mult = PAYOUT_MULT[self.bet_type]
-                    self.win_amount = self.bet_amount * mult
+                    self.win_amount  = self.bet_amount * mult
                     self.app.balance += self.win_amount
+            # allow abort to menu even while wheel spins
+            if pyxel.btnp(pyxel.KEY_Q):
+                self.app.to_menu()
+            return
         else:
             # result screen (result is not None, spin_ticks == 0)
             if self.result is not None:
@@ -154,18 +163,20 @@ class RouletteGame:
             # place bet
             if pyxel.btnp(pyxel.KEY_SPACE) or pyxel.btnp(pyxel.KEY_RETURN):
                 self.app.balance -= self.bet_amount
-                self._spin_ticks = 60  # ~1 second
-                self.result = None
-                self.win_amount = 0
+                self.result      = random.choice(ROULETTE_NUMBERS)   # choose now
+                self.wheel.start_spin(self.result)                   # tell wheel
+                self._spin_ticks = 1         # flag “spinning”; any non-zero works
+                self.win_amount  = 0
 
             if pyxel.btnp(pyxel.KEY_Q):
                 self.app.to_menu()
 
     # ------------------------------------------------------------------- draw
     def draw(self) -> None:
-        if self._spin_ticks:
-            draw_text_center("Spinning…", 110, 7)
-        elif self.result is not None:        # result screen
+        if self._spin_ticks:                # real spinning animation ─────
+            self.wheel.draw()
+            return                          # nothing else while spinning
+        elif self.result is not None:
             self._draw_result()
         else:                                # betting screen
             draw_text_center("Roulette – place your bet", 30, 7)
