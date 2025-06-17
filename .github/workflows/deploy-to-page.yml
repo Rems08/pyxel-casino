@@ -58,10 +58,12 @@ jobs:
       - name: Convert to HTML
         run: |
           mkdir -p ${{ env.OUTPUT_DIR }}
-          pyxel app2html dist/${{ env.APP_NAME }}.pyxapp \
-                         --output ${{ env.OUTPUT_DIR }}/index.html \
-                         --title "My Pyxel Game"
+          # 1️⃣  Create dist/game.html (no extra flags!)
+          pyxel app2html dist/${{ env.APP_NAME }}.pyxapp
+          # 2️⃣  Make it the site entry-point
+          mv dist/${{ env.APP_NAME }}.html ${{ env.OUTPUT_DIR }}/index.html
           touch ${{ env.OUTPUT_DIR }}/.nojekyll
+
 
       # ---- Pages pipeline: all v4/v5/v3 actions ----
       - name: Configure Pages
