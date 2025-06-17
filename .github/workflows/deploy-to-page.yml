@@ -1,29 +1,23 @@
 # .github/workflows/pyxel-web.yml
 name: Build & Deploy Pyxel Web
-
-# ——-- Trigger the build on every push to main, PRs, or manual run
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  push:          { branches: [main] }
+  pull_request:  { branches: [main] }
   workflow_dispatch:
 
-# GitHub Pages needs these three permissions
 permissions:
-  contents: read          # checkout
-  pages:    write         # publish
-  id-token: write         # OIDC for Pages
+  contents: read
+  pages:    write
+  id-token: write
 
-# Adjustable project-wide settings
 env:
-  PYTHON_VERSION: "3.12"      # Any 3.8 +
-  APP_DIR:        "src"       # Where your .py files live
-  STARTUP_SCRIPT: "main.py"   # Entry point
-  APP_NAME:       "game"      # Basename for the .pyxapp
-  OUTPUT_DIR:     "web"       # Folder that becomes the web site
+  PYTHON_VERSION: "3.12"
+  APP_DIR:        "src"
+  STARTUP_SCRIPT: "main.py"
+  APP_NAME:       "game"
+  OUTPUT_DIR:     "web"
 
-concurrency:               # Prevent two deploys racing
+concurrency:
   group: "pages"
   cancel-in-progress: true
 
@@ -33,37 +27,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
+      - name: Set up Python
+        uses: actions/setup-python@v5   # ← v5 is current
 
       - name: Install Pyxel CLI
         run: |
           python -m pip install --upgrade pip
           pip install pyxel
 
-      # 1️⃣  Package the whole game into a single .pyxapp
       - name: Build .pyxapp
         run: |
           mkdir -p dist
           pyxel package ${{ env.APP_DIR }} ${{ env.STARTUP_SCRIPT }} \
-                        --output dist/${{ env.APP_NAME }}.pyxapp   # :contentReference[oaicite:0]{index=0}
+                        --output dist/${{ env.APP_NAME }}.pyxapp
 
-      # 2️⃣  Convert that package to a standalone HTML file
       - name: Convert to HTML
         run: |
           mkdir -p ${{ env.OUTPUT_DIR }}
           pyxel app2html dist/${{ env.APP_NAME }}.pyxapp \
                          --output ${{ env.OUTPUT_DIR }}/index.html \
-                         --title  "My Pyxel Game"                  # :contentReference[oaicite:1]{index=1}
+                         --title "My Pyxel Game"
+          touch ${{ env.OUTPUT_DIR }}/.nojekyll
 
-      - name: Disable Jekyll (optional but safe)
-        run: touch ${{ env.OUTPUT_DIR }}/.nojekyll
+      # ---- Pages pipeline: all v4/v5/v3 actions ----
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3
         with:
           path: ${{ env.OUTPUT_DIR }}
 
@@ -76,4 +68,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4
