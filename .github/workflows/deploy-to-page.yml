@@ -49,8 +49,10 @@ jobs:
       - name: Build .pyxapp
         run: |
           mkdir -p dist
-          pyxel package ${{ env.APP_DIR }} ${{ env.STARTUP_SCRIPT }} \
-                      dist/${{ env.APP_NAME }}.pyxapp
+          # 1. Package the game (creates src.pyxapp)
+          pyxel package "${{ env.APP_DIR }}" "${{ env.STARTUP_SCRIPT }}"
+          # 2. Move/rename to the place our later steps expect
+          mv "${{ env.APP_DIR }}.pyxapp" "dist/${{ env.APP_NAME }}.pyxapp"
 
       - name: Convert to HTML
         run: |
