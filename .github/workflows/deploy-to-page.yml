@@ -50,7 +50,7 @@ jobs:
         run: |
           mkdir -p dist
           pyxel package ${{ env.APP_DIR }} ${{ env.STARTUP_SCRIPT }} \
-                        --output dist/${{ env.APP_NAME }}.pyxapp
+                      dist/${{ env.APP_NAME }}.pyxapp
 
       - name: Convert to HTML
         run: |
