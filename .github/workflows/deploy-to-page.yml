@@ -56,13 +56,13 @@ jobs:
           mv "${{ env.APP_DIR }}.pyxapp" "dist/${{ env.APP_NAME }}.pyxapp"
 
       - name: Convert to HTML
+        working-directory: dist           # <-- change cwd
         run: |
-          mkdir -p ${{ env.OUTPUT_DIR }}
-          # 1️⃣  Create dist/game.html (no extra flags!)
-          pyxel app2html dist/${{ env.APP_NAME }}.pyxapp
-          # 2️⃣  Make it the site entry-point
-          mv dist/${{ env.APP_NAME }}.html ${{ env.OUTPUT_DIR }}/index.html
-          touch ${{ env.OUTPUT_DIR }}/.nojekyll
+          pyxel app2html "${{ env.APP_NAME }}.pyxapp"   # creates game.html here
+          mkdir -p ../${{ env.OUTPUT_DIR }}
+          mv "${{ env.APP_NAME }}.html" ../${{ env.OUTPUT_DIR }}/index.html
+          touch ../${{ env.OUTPUT_DIR }}/.nojekyll
+
 
 
       # ---- Pages pipeline: all v4/v5/v3 actions ----
