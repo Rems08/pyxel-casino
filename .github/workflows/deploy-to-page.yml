@@ -1,61 +1,71 @@
-# GitHub Actions workflow — build & publish your Python game to GitHub Pages
-# -------------------------------------------------------------------------
-# – Triggered on every push to the default branch (main) or via the manual
-#   "Run workflow" button.
-# – Uses pygbag to transpile your game (pygame/arcade/etc.) to WebAssembly
-#   so it can run in the browser through Pyodide.
-# – Uploads the generated static site (dist/) as a Pages artifact and
-#   publishes it via the native GitHub Pages deployment action.
-# -------------------------------------------------------------------------
+# .github/workflows/pyxel-web.yml
+name: Build & Deploy Pyxel Web
 
-name: Build & Deploy Python Game to GitHub Pages
-
+# ——-- Trigger the build on every push to main, PRs, or manual run
 on:
   push:
-    branches: [ "main" ]   # change if you use a different default branch
-  workflow_dispatch:       # allow manual runs from the Actions tab
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
-# Minimal permissions required by the Pages service
+# GitHub Pages needs these three permissions
 permissions:
-  contents: read     # to clone the repo
-  pages: write       # to push the static site
-  id-token: write    # to authenticate the deployment
+  contents: read          # checkout
+  pages:    write         # publish
+  id-token: write         # OIDC for Pages
 
-# Prevent overlapping builds on fast‑moving branches
-concurrency:
+# Adjustable project-wide settings
+env:
+  PYTHON_VERSION: "3.12"      # Any 3.8 +
+  APP_DIR:        "src"       # Where your .py files live
+  STARTUP_SCRIPT: "main.py"   # Entry point
+  APP_NAME:       "game"      # Basename for the .pyxapp
+  OUTPUT_DIR:     "web"       # Folder that becomes the web site
+
+concurrency:               # Prevent two deploys racing
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: ⬇️ Checkout source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
         with:
-          python-version: "3.12"      # match your dev version
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
 
-      - name: 📦 Install build toolchain (pygbag)
+      - name: Install Pyxel CLI
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pygbag         # compiles pygame‑style code to WASM
+          pip install pyxel
 
-      - name: 🏗️ Build web bundle
+      # 1️⃣  Package the whole game into a single .pyxapp
+      - name: Build .pyxapp
         run: |
-          # Replace main.py with your real entry point if different
-          pygbag --build main.py --output dist
+          mkdir -p dist
+          pyxel package ${{ env.APP_DIR }} ${{ env.STARTUP_SCRIPT }} \
+                        --output dist/${{ env.APP_NAME }}.pyxapp   # :contentReference[oaicite:0]{index=0}
 
-      # OPTIONAL: If your game depends on extra data (images, sounds, etc.)
-      # you can sync them into dist/ here, e.g.:
-      #   rsync -av --exclude "*.py" assets/ dist/assets/
+      # 2️⃣  Convert that package to a standalone HTML file
+      - name: Convert to HTML
+        run: |
+          mkdir -p ${{ env.OUTPUT_DIR }}
+          pyxel app2html dist/${{ env.APP_NAME }}.pyxapp \
+                         --output ${{ env.OUTPUT_DIR }}/index.html \
+                         --title  "My Pyxel Game"                  # :contentReference[oaicite:1]{index=1}
 
-      - name: 📤 Upload Pages artifact
+      - name: Disable Jekyll (optional but safe)
+        run: touch ${{ env.OUTPUT_DIR }}/.nojekyll
+
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v2
         with:
-          path: dist                    # folder produced by pygbag
+          path: ${{ env.OUTPUT_DIR }}
 
   deploy:
     needs: build
@@ -64,6 +74,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: 🚀 Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
